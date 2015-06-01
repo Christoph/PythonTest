@@ -1,11 +1,11 @@
 from nose.tools import *
-import tagrefinery
+import tagrefinery.helper as h
 
-def setup():
-    print("Setup!")
+def test_dice_coefficient():
+    s1 = ["a","b"]
+    s2 = ["a","c"]
+    sim = h.StringSimilarity()
 
-def teardown():
-    print("Tear down!")
-
-def test_basix():
-    print("I ran!")
+    assert_equal(sim.dice_coefficient(s1,s1),1)
+    assert_equal(sim.dice_coefficient(s1,[]),0)
+    assert_equal(sim.dice_coefficient(s1,s2),0.5)
