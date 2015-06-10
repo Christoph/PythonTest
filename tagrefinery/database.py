@@ -28,7 +28,8 @@ class InitializeDB:
 
     # Update table from pandas dataframe
     def updateTable(self, table, data):
-        for i,r in data.iterrows():
-            InitializeDB.engine.execute(table.update()
-                    .where(table.c.ID==int(i))
-                    .values(r.to_dict()))
+        with InitializeDB.engine.begin() as conn:
+            for i,r in data.iterrows():
+                conn.execute(table.update()
+                        .where(table.c.ID==int(i))
+                        .values(r.to_dict()))
