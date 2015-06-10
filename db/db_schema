@@ -1,39 +1,62 @@
-create table Tag(
-  ID int  NOT NULL AUTO_INCREMENT,
-  Name varchar(150) NOT NULL,
-  PRIMARY KEY(ID)
-    );
+-- Create syntax for TABLE 'Ancestor'
+CREATE TABLE `Ancestor` (
+  `ID` int(11) NOT NULL AUTO_INCREMENT,
+  `Name` varchar(150) NOT NULL,
+  `Context` varchar(150) DEFAULT NULL,
+  PRIMARY KEY (`ID`)
+) ENGINE=InnoDB AUTO_INCREMENT=31453 DEFAULT CHARSET=latin1;
 
-  create table Artist(
-  ID int NOT NULL AUTO_INCREMENT,
-  Name varchar(150) NOT NULL,
-  PRIMARY KEY(ID)
-      );
+-- Create syntax for TABLE 'Artist'
+CREATE TABLE `Artist` (
+  `ID` int(11) NOT NULL AUTO_INCREMENT,
+  `Name` varchar(150) NOT NULL,
+  PRIMARY KEY (`ID`)
+) ENGINE=InnoDB AUTO_INCREMENT=4106 DEFAULT CHARSET=latin1;
 
-  create table Track(
-  ID int NOT NULL AUTO_INCREMENT,
-  Name varchar(150) NOT NULL,
-  ArtistID int NOT NULL,
-  Listeners int NOT NULL,
-  Playcount int NOT NULL,
-  PRIMARY KEY(ID),
-  UNIQUE(Name, ArtistID),
-  FOREIGN KEY(ArtistID) REFERENCES Artist(ID)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE
-      );
+-- Create syntax for TABLE 'Tag'
+CREATE TABLE `Tag` (
+  `ID` int(11) NOT NULL AUTO_INCREMENT,
+  `Name` varchar(150) NOT NULL,
+  `Occurrence` int(11) DEFAULT '0',
+  PRIMARY KEY (`ID`)
+) ENGINE=InnoDB AUTO_INCREMENT=31453 DEFAULT CHARSET=latin1;
 
-  create table TT(
-  ID int NOT NULL AUTO_INCREMENT,
-  TrackID int NOT NULL,
-  TagID int NOT NULL,
-  Count int NOT NULL,
-  PRIMARY KEY(ID),
-  UNIQUE(TrackID, TagID),
-  FOREIGN KEY(TrackID) REFERENCES Track(ID)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
-  FOREIGN KEY(TagID) REFERENCES Tag(ID)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE
-      );
+-- Create syntax for TABLE 'AT'
+CREATE TABLE `AT` (
+  `ID` int(11) NOT NULL AUTO_INCREMENT,
+  `AncestorID` int(11) NOT NULL,
+  `TagID` int(11) NOT NULL,
+  PRIMARY KEY (`ID`),
+  UNIQUE KEY `AncestorID` (`AncestorID`,`TagID`),
+  KEY `TagID` (`TagID`),
+  CONSTRAINT `at_ibfk_1` FOREIGN KEY (`AncestorID`) REFERENCES `Ancestor` (`ID`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `at_ibfk_2` FOREIGN KEY (`TagID`) REFERENCES `Tag` (`ID`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=32768 DEFAULT CHARSET=latin1;
+
+-- Create syntax for TABLE 'Track'
+CREATE TABLE `Track` (
+  `ID` int(11) NOT NULL AUTO_INCREMENT,
+  `Name` varchar(150) NOT NULL,
+  `ArtistID` int(11) NOT NULL,
+  `Listeners` int(11) NOT NULL,
+  `Playcount` int(11) NOT NULL,
+  PRIMARY KEY (`ID`),
+  UNIQUE KEY `Name` (`Name`,`ArtistID`),
+  KEY `ArtistID` (`ArtistID`),
+  CONSTRAINT `Track_ibfk_1` FOREIGN KEY (`ArtistID`) REFERENCES `Artist` (`ID`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=4745 DEFAULT CHARSET=latin1;
+
+-- Create syntax for TABLE 'TT'
+CREATE TABLE `TT` (
+  `ID` int(11) NOT NULL AUTO_INCREMENT,
+  `TrackID` int(11) NOT NULL,
+  `TagID` int(11) NOT NULL,
+  `LastFMWeight` int(11) NOT NULL,
+  `Importance` float NOT NULL DEFAULT '0',
+  `Frequency` int(11) NOT NULL DEFAULT '1',
+  PRIMARY KEY (`ID`),
+  UNIQUE KEY `TrackID` (`TrackID`,`TagID`),
+  KEY `TagID` (`TagID`),
+  CONSTRAINT `TT_ibfk_1` FOREIGN KEY (`TrackID`) REFERENCES `Track` (`ID`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `TT_ibfk_2` FOREIGN KEY (`TagID`) REFERENCES `Tag` (`ID`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=81599 DEFAULT CHARSET=latin1;

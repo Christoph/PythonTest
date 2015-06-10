@@ -1,3 +1,5 @@
+#OLD
+
 # Simple querys
 SELECT * from Artist;
 SELECT * from Track;
