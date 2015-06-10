@@ -26,9 +26,9 @@ class InitializeDB:
     query_Track = "select * from Track"
     query_Artist = "select * from Artist"
 
-    # Update table with pandas dataframe
-    def updateTable(table, data, conn = engine):
+    # Update table from pandas dataframe
+    def updateTable(self, table, data):
         for i,r in data.iterrows():
-            conn.execute(table.update()
+            InitializeDB.engine.execute(table.update()
                     .where(table.c.ID==int(i))
                     .values(r.to_dict()))
