@@ -1,6 +1,257 @@
 "use strict";
 
-function scatterPlotChart() {
+function barChart(chartDiv) {
+    var _chart = {};
+
+    var _width = 600, _height = 250,
+            _margins = {top: 30, left: 30, right: 30, bottom: 30},
+            _xDomain = [-1,10], _yDomain = [0,10],
+            _data = [],
+            _colors = d3.scale.category10(),
+            _svg,
+            _bodyG;
+
+    //
+    //
+    // Define axis and scales
+    //
+    //
+
+    var _x = d3.scale.linear()
+        .domain(_xDomain)
+        .range([0, quadrantWidth()]);
+
+    var _y = d3.scale.linear()
+        .domain(_yDomain)
+        .range([quadrantHeight(), 0]);
+
+    var _xAxis = d3.svg.axis()
+                .scale(_x)
+                .orient("bottom");        
+
+    var _yAxis = d3.svg.axis()
+                .scale(_y)
+                .orient("left");
+
+    //
+    //
+    // Main render function
+    //
+    //
+    
+    _chart.render = function () {
+        if (!_svg) {
+            _svg = d3.select(chartDiv).append("svg")
+                    .attr("height", _height)
+                    .attr("width", _width)
+                    .style("background-color", "white");
+
+            renderAxes(_svg);
+
+            defineBodyClip(_svg);
+        }
+
+        renderBody(_svg);
+    };
+
+    function renderBody(svg) {
+        if (!_bodyG)
+            _bodyG = svg.append("g")
+                    .attr("class", "body")
+                    .attr("transform", "translate(" 
+                            + xStart() 
+                            + "," 
+                            + yEnd() + ")")
+                    .attr("clip-path", "url(#body-clip-bar1)");
+
+        renderBars();
+    };
+    
+    // 
+    //
+    // Axis render method
+    //
+    //
+
+    function renderAxes(svg) {
+        var axesG = svg.append("g")
+                .attr("class", "axes");
+
+        axesG.append("g")
+                .attr("class", "x axis")
+                .attr("transform", function () {
+                    return "translate(" + xStart() + "," + yStart() + ")";
+                })
+                .call(_xAxis);
+
+        axesG.append("g")
+                .attr("class", "y axis")
+                .attr("transform", function () {
+                    return "translate(" + xStart() + "," + yEnd() + ")";
+                })
+                .call(_yAxis);
+    }
+
+    //
+    //
+    // Clipping function
+    //
+    //
+
+    function defineBodyClip(svg) {
+        var padding = 5;
+
+        svg.append("defs")
+                .append("clipPath")
+                .attr("id", "body-clip-bar1")
+                .append("rect")
+                .attr("x", 0 - padding)
+                .attr("y", 0)
+                .attr("width", quadrantWidth() + 2 * padding)
+                .attr("height", quadrantHeight());
+    }
+
+    //
+    //
+    // Render Data
+    // 
+    //
+
+    function renderBars() {
+        var padding = 2; 
+
+        _bodyG.selectAll("rect.bar")
+                    .data(_data)
+                .enter()
+                .append("rect")
+                .attr("class", "bar");
+
+        _bodyG.selectAll("rect.bar")
+                    .data(_data)                    
+                .transition()
+                .attr("x", function (d) { 
+                    return _x(d.x);
+                })
+                .attr("y", function (d) { 
+                    return _y(d.y);
+                })
+                .attr("height", function (d) { 
+                    return yStart() - _y(d.y); 
+                })
+                .attr("width", function(d){
+                    return Math.floor(quadrantWidth() / _data.length) - padding;
+                });
+    }
+
+    //
+    //
+    // Internal Functions
+    //
+    //
+
+    function xStart() {
+        return _margins.left;
+    }
+
+    function yStart() {
+        return _height - _margins.bottom;
+    }
+
+    function xEnd() {
+        return _width - _margins.right;
+    }
+
+    function yEnd() {
+        return _margins.top;
+    }
+
+    function quadrantWidth() {
+        return _width - _margins.left - _margins.right;
+    }
+
+    function quadrantHeight() {
+        return _height - _margins.top - _margins.bottom;
+    }
+
+    function getDomains() {
+        var xmax = d3.max(_data, function(d) {
+            return d.x;
+            });
+
+        var ymax = d3.max(_data, function(d) {
+            return d.y;
+            });
+
+        var xmin = d3.min(_data, function(d) {
+            return d.x;
+            });
+
+        var ymin = d3.min(_data, function(d) {
+            return d.y;
+            });
+
+        _xDomain = [Math.floor(xmin),Math.ceil(xmax)+1];
+        _yDomain = [Math.floor(ymin),Math.ceil(ymax)];
+
+        _x.domain(_xDomain);
+        _y.domain(_yDomain);
+    }
+
+    // 
+    //
+    // External function
+    //
+    //
+
+    _chart.width = function (w) {
+        if (!arguments.length) return _width;
+        _width = w;
+        return _chart;
+    };
+
+    _chart.height = function (h) {
+        if (!arguments.length) return _height;
+        _height = h;
+        return _chart;
+    };
+
+    _chart.margins = function (m) {
+        if (!arguments.length) return _margins;
+        _margins = m;
+        return _chart;
+    };
+
+    _chart.colors = function (c) {
+        if (!arguments.length) return _colors;
+        _colors = c;
+        return _chart;
+    };
+
+    _chart.x = function (x) {
+        if (!arguments.length) return _x;
+        _x = x;
+        return _chart;
+    };
+
+    _chart.y = function (y) {
+        if (!arguments.length) return _y;
+        _y = y;
+        return _chart;
+    };
+
+    _chart.setSeries = function (series) {
+        _data = series;
+        
+        getDomains();
+
+        return _chart;
+    };
+
+    return _chart;
+}
+
+
+function scatterPlotChart(chartDiv) {
     //
     //
     // Variable Definition
@@ -48,7 +299,7 @@ function scatterPlotChart() {
     
     _chart.render = function () {
         if (!_svg) {
-            _svg = d3.select("#scatter").append("svg")
+            _svg = d3.select(chartDiv).append("svg")
                     .attr("height", _height)
                     .attr("width", _width)
                     .style("background-color","white")
@@ -81,31 +332,36 @@ function scatterPlotChart() {
         renderBody(_svg);
     };
 
-    //
-    //
-    // Axis functions
-    //
-    //
+
+    function renderBody(svg) {
+        if (!_bodyG)
+            _bodyG = svg.append("g")
+                    .attr("class", "body")                    
+                    .attr("transform", "translate(" 
+                        + xStart() + "," 
+                        + yEnd() + ")") 
+                    .attr("clip-path", "url(#body-clip-scatter)");
+
+        renderText();
+    }
     
+    // 
+    //
+    // Axis render method
+    //
+    //
+
     function renderAxes(svg) {
         var axesG = svg.append("g")
                 .attr("class", "axes");
 
-        renderXAxis(axesG);
-
-        renderYAxis(axesG);
-    }
-    
-    function renderXAxis(axesG){
-         axesG.append("g")
+        axesG.append("g")
                 .attr("class", "x axis")
                 .attr("transform", function () {
                     return "translate(" + xStart() + "," + yStart() + ")";
                 })
                 .call(_xAxis);
-    }
-    
-    function renderYAxis(axesG){
+
         axesG.append("g")
                 .attr("class", "y axis")
                 .attr("transform", function () {
@@ -116,35 +372,23 @@ function scatterPlotChart() {
 
     //
     //
-    // Cliping and body functions
+    // Cliping function
     //
     //
-    
+
     function defineBodyClip(svg) {
-        var padding = 5;
+        var padding = 0;
 
         svg.append("defs")
                 .append("clipPath")
-                .attr("id", "body-clip")
+                .attr("id", "body-clip-scatter")
                 .append("rect")
                 .attr("x", 0 - padding)
                 .attr("y", 0)
                 .attr("width", quadrantWidth() + 2 * padding)
                 .attr("height", quadrantHeight());
     }
-
-    function renderBody(svg) {
-        if (!_bodyG)
-            _bodyG = svg.append("g")
-                    .attr("class", "body")                    
-                    .attr("transform", "translate(" 
-                        + xStart() + "," 
-                        + yEnd() + ")") 
-                    .attr("clip-path", "url(#body-clip)");
-
-        renderText();
-    }
-    
+   
     //
     //
     // Render the data
@@ -172,6 +416,7 @@ function scatterPlotChart() {
 
     function renderText() { 
         _data.forEach(function (list, i) {
+            // Enter
             _bodyG.selectAll("text._" + i)
                     .data(list)
                     .enter()
@@ -180,12 +425,15 @@ function scatterPlotChart() {
                     .on("mouseover",tip.show)
                     .on("mouseout", tip.hide);
 
+            // Update
             _bodyG.selectAll("text._" + i)
                     .data(list)
                     .style("fill",_colors(i))
                     .transition() 
                         .attr("transform", function(d){ return "translate(" + _x(d.x) + "," + _y(d.y) + ")"; })
                         .text(function (d) { return d.text });
+
+            // Exit
         });
     }
 
@@ -355,7 +603,247 @@ function scatterPlotChart() {
     return _chart;
 }
 
+function histogram(_data, chartDiv) {
+    //
+    //
+    // Variable declaration
+    //
+    //
+    
+    var _chart = {};
 
+    var _width = 600, _height = 250,
+            _margins = {top: 30, left: 30, right: 30, bottom: 30},
+            _colors = d3.scale.category10(),
+            _svg,
+            _bodyG;
+    
+    // A formatter for counts.
+    var formatCount = d3.format(",.0f");
+
+    //
+    //
+    // Definitions
+    //
+    //
+    
+    console.log(_data);
+
+    // Get X scaling
+    var _x = d3.scale.linear()
+        .domain(getXDomain())
+        .range([0, quadrantWidth()]);
+    
+    // Generate histogram
+    var _hist = d3.layout.histogram()
+            .bins(_x.ticks(10))
+            ([].map.call(_data, function(d) { return d.y; }));
+        
+    console.log(_hist);
+
+    // Get Y scaling
+    var _y = d3.scale.linear()
+    .domain(getYDomain())
+    .range([quadrantHeight(), 0]);
+
+    //
+    //
+    // Define axis and scales
+    //
+    //
+
+    var _xAxis = d3.svg.axis()
+                .scale(_x)
+                .orient("bottom");        
+
+    var _yAxis = d3.svg.axis()
+                .scale(_y)
+                .orient("left");
+
+    //
+    //
+    // Main render function
+    //
+    //
+    
+    _chart.render = function () {
+        if (!_svg) {
+            _svg = d3.select(chartDiv).append("svg")
+                    .attr("height", _height)
+                    .attr("width", _width)
+                    .style("background-color", "white");
+
+            renderAxes(_svg);
+
+            defineBodyClip(_svg);
+
+            renderBody(_svg);
+        }
+
+        renderBars();
+    };
+
+    // 
+    //
+    // Basic rendering
+    //
+    //
+    
+    function renderAxes(svg) {
+        var axesG = svg.append("g")
+                .attr("class", "axes");
+
+        axesG.append("g")
+                .attr("class", "x axis")
+                .attr("transform", function () {
+                    return "translate(" + xStart() + "," + yStart() + ")";
+                })
+                .call(_xAxis);
+
+        axesG.append("g")
+                .attr("class", "y axis")
+                .attr("transform", function () {
+                    return "translate(" + xStart() + "," + yEnd() + ")";
+                })
+                .call(_yAxis);
+    }
+
+    function defineBodyClip(svg) {
+        var padding = 5;
+
+        svg.append("defs")
+                .append("clipPath")
+                .attr("id", "body-clip")
+                .append("rect")
+                .attr("x", 0 - padding)
+                .attr("y", 0)
+                .attr("width", quadrantWidth() + 2 * padding)
+                .attr("height", quadrantHeight());
+    }
+
+    function renderBody(svg) {
+        if (!_bodyG)
+            _bodyG = svg.append("g")
+                    .attr("class", "body")
+                    .attr("transform", "translate(" 
+                            + xStart() 
+                            + "," 
+                            + yEnd() + ")")
+                    .attr("clip-path", "url(#body-clip)");
+    };
+
+    //
+    //
+    // Render Data
+    // 
+    //
+
+    function renderBars() {
+
+        // Enter
+        var bar = _bodyG.selectAll(".bar")
+            .data(_hist)
+            .enter()
+            .append("g")
+            .attr("class","bar")
+            .attr("transform", function(d) { return "translate("+_x(d.x)+","+_y(d.y)+")"; });
+
+        bar.append("rect")
+            .attr("x", 1)
+            .attr("width", _x(_hist[0].dx) - 1)
+            .attr("height", function(d) { return yStart() - _y(d.y); });
+
+        bar.append("text")
+            .attr("dy", ".75em")
+            .attr("y", -12)
+            .attr("x", _x(_hist[0].dx) / 2)
+            .attr("text-anchor", "middle")
+            .text(function(d) { return formatCount(d.y); });
+    }
+
+    //
+    //
+    // Internal Functions
+    //
+    //
+
+    function xStart() {
+        return _margins.left;
+    }
+
+    function yStart() {
+        return _height - _margins.bottom;
+    }
+
+    function xEnd() {
+        return _width - _margins.right;
+    }
+
+    function yEnd() {
+        return _margins.top;
+    }
+
+    function quadrantWidth() {
+        return _width - _margins.left - _margins.right;
+    }
+
+    function quadrantHeight() {
+        return _height - _margins.top - _margins.bottom;
+    }
+
+    function getXDomain() {
+        var xmax = d3.max(_data, function(d) {
+            return d.x;
+            });
+
+        var xmin = d3.min(_data, function(d) {
+            return d.x;
+            });
+
+        return [Math.floor(xmin),Math.ceil(xmax)];
+    }
+
+    function getYDomain() {
+        var ymax = d3.max(_hist, function(d) {
+            return d.y;
+            });
+
+        return [0,Math.ceil(ymax)+1];
+    }
+
+
+    // 
+    //
+    // External function
+    //
+    //
+
+    _chart.width = function (w) {
+        if (!arguments.length) return _width;
+        _width = w;
+        return _chart;
+    };
+
+    _chart.height = function (h) {
+        if (!arguments.length) return _height;
+        _height = h;
+        return _chart;
+    };
+
+    _chart.margins = function (m) {
+        if (!arguments.length) return _margins;
+        _margins = m;
+        return _chart;
+    };
+
+    _chart.colors = function (c) {
+        if (!arguments.length) return _colors;
+        _colors = c;
+        return _chart;
+    };
+
+    return _chart;
+}
 //
 //
 //
@@ -364,23 +852,41 @@ function scatterPlotChart() {
 //
 //
 
+// Random function
 function randomData() {
     return Math.random() * 9;
 }
 
-var numberOfSeries = 3,
-    numberOfDataPoint = 11,
-    data = [];
+// Variable declaration
+var numberOfSeries = 1,
+    numberOfDataPoint = 50;
 
+var data = [];
+var data_bar1 = [];
+
+// Fill up data 
 for (var i = 0; i < numberOfSeries; ++i)
     data.push(d3.range(numberOfDataPoint).map(function (i) {
         return {x: randomData(), y: randomData(), text: i};
     }));
 
-var chart = scatterPlotChart();
-
-data.forEach(function (series) {
-    chart.addSeries(series);
+data_bar1 = d3.range(numberOfDataPoint).map(function (i) {
+    return {x: i, y: randomData()};
 });
 
-chart.render();
+// Create chart objects
+var scatter = scatterPlotChart("#scatter");
+var bar = barChart("#bar1");
+var hist = histogram(data[0], "#hist1");
+
+// fill up charts with data
+data.forEach(function (series) {
+    scatter.addSeries(series);
+});
+
+bar.setSeries(data_bar1);
+
+// Render charts
+scatter.render();
+bar.render();
+hist.render();
