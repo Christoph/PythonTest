@@ -1,5 +1,34 @@
 "use strict";
 
+// 
+//
+// Utility functions
+//
+//
+
+function toggleClass(element, className) {
+        d3.select(element)
+            .classed(className, function (d, i) {
+                return !d3.select(element).classed(className);
+            });
+    }
+
+function classElementsIn(element, className, compareObjs) {
+    toggleClass(element, className);
+
+    var current = d3.select(element).data()[0];
+
+    d3.selectAll(compareObjs)
+        .filter(function(d) { return d == current; })
+        [0].forEach(function(d,i,k) { toggleClass(d,className); });
+}
+
+//
+//
+// Chart functions
+//
+//
+
 function barChart(chartDiv) {
     var _chart = {};
 
@@ -124,7 +153,22 @@ function barChart(chartDiv) {
                     .data(_data)
                 .enter()
                 .append("rect")
-                .attr("class", "bar");
+                .attr("class", "bar")
+                .on("click", function(d) {
+                    classElementsIn(this, "highlight", "text._0");
+                    /*
+                    toggleClass(this, "highlight");
+
+                    var current = d3.select(this).data()[0]
+
+                    d3.selectAll("text._0")
+                        .filter(function(d) { 
+                            return d == current; })
+                        [0].forEach(function(d,i,k) {
+                        toggleClass(d,"highlight");
+                    })
+                    */
+                });
 
         _bodyG.selectAll("rect.bar")
                     .data(_data)                    
@@ -143,6 +187,7 @@ function barChart(chartDiv) {
                 });
     }
 
+    
     //
     //
     // Internal Functions
@@ -626,8 +671,6 @@ function histogram(_data, chartDiv) {
     // Definitions
     //
     //
-    
-    console.log(_data);
 
     // Get X scaling
     var _x = d3.scale.linear()
@@ -639,8 +682,6 @@ function histogram(_data, chartDiv) {
             .bins(_x.ticks(10))
             ([].map.call(_data, function(d) { return d.y; }));
         
-    console.log(_hist);
-
     // Get Y scaling
     var _y = d3.scale.linear()
     .domain(getYDomain())
@@ -844,6 +885,328 @@ function histogram(_data, chartDiv) {
 
     return _chart;
 }
+
+function hexPlot(_data, chartDiv) {
+    //
+    //
+    // Variable declaration
+    //
+    //
+    
+    var _chart = {};
+
+    var _width = 600, _height = 600,
+            _margins = {top: 30, left: 30, right: 30, bottom: 30},
+            _svg,
+            _bodyG;
+    
+    //
+    //
+    // Definitions
+    //
+    //
+    
+    // Color scale
+    var _color = d3.scale.linear()
+        .domain([0,4])
+        .range(["white", "steelblue"])
+        .interpolate(d3.interpolateLab);
+
+    // Get X scaling
+    
+    var _xDomain = d3.extent(_data, function(d) { return d.x; });
+
+    var _x = d3.scale.linear()
+        .domain(_xDomain).nice()
+        .range([0,quadrantWidth()]);
+
+    
+    // Get Y scaling
+    
+    var _yDomain = d3.extent(_data, function(d) { return d.y; });
+
+    var _y = d3.scale.linear()
+        .domain(_yDomain).nice()
+        .range([quadrantHeight(),0]);
+
+    // Hexbins
+    var _hexbin = d3.hexbin()
+        .size([quadrantWidth(),quadrantHeight()])
+        .radius(25);
+
+    //
+    //
+    // Data reformating
+    //
+    //
+    
+    var _hexdata = [];
+
+    _data.forEach(function(d) {
+        _hexdata.push({point:[d.x,d.y], text:d.text});
+    })
+
+    //
+    //
+    // Define axis and scales
+    //
+    //
+
+    var _xAxis = d3.svg.axis()
+                .scale(_x)
+                .orient("bottom");        
+
+    var _yAxis = d3.svg.axis()
+                .scale(_y)
+                .orient("left");
+
+    //
+    //
+    // Main render function
+    //
+    //
+    
+    _chart.render = function () {
+        if (!_svg) {
+            _svg = d3.select(chartDiv).append("svg")
+                    .attr("height", _height)
+                    .attr("width", _width)
+                    .style("background-color", "white")
+                    .call(zoom);
+
+            renderAxes(_svg);
+
+            defineBodyClip(_svg);
+
+            renderBody(_svg);
+        }
+
+        renderBins();
+    };
+
+    // 
+    //
+    // Basic rendering
+    //
+    //
+    
+    function renderAxes(svg) {
+        var axesG = svg.append("g")
+                .attr("class", "axes");
+
+        axesG.append("g")
+                .attr("class", "x axis")
+                .attr("transform", function () {
+                    return "translate(" + xStart() + "," + yStart() + ")";
+                })
+                .call(_xAxis);
+
+        axesG.append("g")
+                .attr("class", "y axis")
+                .attr("transform", function () {
+                    return "translate(" + xStart() + "," + yEnd() + ")";
+                })
+                .call(_yAxis);
+    }
+
+    function defineBodyClip(svg) {
+        var padding = 0;
+
+        svg.append("defs")
+                .append("clipPath")
+                .attr("id", "body-clip-hex")
+                .append("rect")
+                .attr("x", 0 - padding)
+                .attr("y", 0)
+                .attr("width", quadrantWidth() + 2 * padding)
+                .attr("height", quadrantHeight());
+    }
+
+    function renderBody(svg) {
+        if (!_bodyG)
+            _bodyG = svg.append("g")
+                    .attr("class", "body")
+                    .attr("transform", "translate(" 
+                            + xStart() 
+                            + "," 
+                            + yEnd() + ")")
+                    .attr("clip-path", "url(#body-clip-hex)");
+    };
+
+    //
+    //
+    // Render Data
+    // 
+    //
+    var formatCount = d3.format(".0f");
+
+    function renderBins() {
+        var data = _hexbin([].map.call(_hexdata, function(d) { return scalePoint(d.point); }));
+        
+        var dict = d3.map(_hexdata.map(function(d) { return {point: scalePoint(d.point), text: d.text}; }), function(d) { return d.point; });
+        
+        // Groups
+        var bin = _bodyG.selectAll(".hexagon")
+            .data(data, function(d) { return d[0]; })
+            .enter()
+            .append("g")
+            .attr("class","hexagon");
+
+        // Enter
+        bin.append("path")
+            .style("fill", function(d) { return _color(d.length); })
+            .attr("d",_hexbin.hexagon(0));
+                //.on("mouseover",tip.show)
+                //.on("mouseout", tip.hide);
+
+        bin.append("text")
+            .attr("dy", ".25em")
+            .attr("y", function(d) { return d.y; })
+            .attr("x", function(d) { return d.x; })
+            .attr("text-anchor", "middle");
+
+        // Update
+        _bodyG.selectAll(".hexagon").select("path")
+                .data(data, function(d) { return d[0]; })
+                .attr("transform", function(d) { return "translate("+d.x+","+d.y+")"; })
+                .transition()
+                .duration(800)
+                .attr("d", function(d) {
+                    if(d.length>1)
+                    {
+                        return _hexbin.hexagon(25);
+                    }
+                    else
+                    {
+                        return _hexbin.hexagon(0);
+                    }
+                })
+                .style("fill", function(d) { return _color(d.length); });
+
+        _bodyG.selectAll(".hexagon").select("text")
+                .data(data, function(d) { return d[0]; })
+                .attr("y", function(d) { return d.y; })
+                .attr("x", function(d) { return d.x; })
+                .transition()
+                .duration(500)
+                .text(function(d) {
+                    if(d.length>1)
+                    {
+                        return d.length;
+                    }
+                    else
+                    {
+                        return dict.get(d[0]).text;
+                    }
+                    return "Err";
+                });
+
+        // Exit
+        _bodyG.selectAll(".hexagon")
+            .data(data, function(d) { return d[0]; })
+            .exit()
+            .remove();
+    }
+
+    //
+    //
+    // Zoom functions
+    //
+    //
+    
+    var zoom = d3.behavior.zoom()
+        .x(_x)
+        .y(_y)
+        .scaleExtent(_xDomain)
+        .on("zoom", zoomed);
+
+    function zoomed() {
+      renderBins();
+      _svg.select(".x.axis").call(_xAxis);
+      _svg.select(".y.axis").call(_yAxis);
+
+    }
+
+    function reset() {
+      d3.transition().duration(750).tween("zoom", function() {
+        var ix = d3.interpolate(_x.domain(), _xDomain),
+            iy = d3.interpolate(_y.domain(), _yDomain);
+        return function(t) {
+          zoom.x(_x.domain(ix(t))).y(_y.domain(iy(t)));
+          zoomed();
+        };
+      });
+    }
+
+    //
+    //
+    // Internal Functions
+    //
+    //
+
+    function xStart() {
+        return _margins.left;
+    }
+
+    function yStart() {
+        return _height - _margins.bottom;
+    }
+
+    function xEnd() {
+        return _width - _margins.right;
+    }
+
+    function yEnd() {
+        return _margins.top;
+    }
+
+    function quadrantWidth() {
+        return _width - _margins.left - _margins.right;
+    }
+
+    function quadrantHeight() {
+        return _height - _margins.top - _margins.bottom;
+    }
+
+    function getXDomain() {
+        return d3.extent(_data, function(d) { return d.x });
+    }
+
+    function getYDomain() {
+        return d3.extent(_data, function(d) { return d.y });
+    }
+
+    function scalePoint(point) {
+        return [_x(point[0]), _y(point[1])];
+    }
+
+    // 
+    //
+    // External function
+    //
+    //
+
+    _chart.width = function (w) {
+        if (!arguments.length) return _width;
+        _width = w;
+        return _chart;
+    };
+
+    _chart.height = function (h) {
+        if (!arguments.length) return _height;
+        _height = h;
+        return _chart;
+    };
+
+    _chart.margins = function (m) {
+        if (!arguments.length) return _margins;
+        _margins = m;
+        return _chart;
+    };
+
+    return _chart;
+}
+
 //
 //
 //
@@ -859,10 +1222,9 @@ function randomData() {
 
 // Variable declaration
 var numberOfSeries = 1,
-    numberOfDataPoint = 50;
+    numberOfDataPoint = 500;
 
 var data = [];
-var data_bar1 = [];
 
 // Fill up data 
 for (var i = 0; i < numberOfSeries; ++i)
@@ -870,23 +1232,21 @@ for (var i = 0; i < numberOfSeries; ++i)
         return {x: randomData(), y: randomData(), text: i};
     }));
 
-data_bar1 = d3.range(numberOfDataPoint).map(function (i) {
-    return {x: i, y: randomData()};
-});
-
 // Create chart objects
 var scatter = scatterPlotChart("#scatter");
 var bar = barChart("#bar1");
 var hist = histogram(data[0], "#hist1");
+var hex = hexPlot(data[0], "#hex");
 
 // fill up charts with data
 data.forEach(function (series) {
     scatter.addSeries(series);
 });
 
-bar.setSeries(data_bar1);
+bar.setSeries(data[0]);
 
 // Render charts
 scatter.render();
 bar.render();
 hist.render();
+hex.render();
