@@ -648,7 +648,7 @@ function scatterPlotChart(chartDiv) {
     return _chart;
 }
 
-function histogram(_data, chartDiv) {
+function histogram() {
     //
     //
     // Variable declaration
@@ -658,48 +658,30 @@ function histogram(_data, chartDiv) {
     var _chart = {};
 
     var _width = 600, _height = 250,
-            _margins = {top: 30, left: 30, right: 30, bottom: 30},
-            _colors = d3.scale.category10(),
-            _svg,
-            _bodyG;
+        _margins = {top: 30, left: 70, right: 50, bottom: 40},
+        _colors = d3.scale.category10(),
+        _title,
+        _x, _y,
+        _xAxis, _yAxis,
+        _xName, _yName,
+        _svg,
+        _group,
+        _bins,
+        _ticks,
+        _dimension,
+        _filter, 
+        _chartDiv,
+        _reloadAll,
+        _hist,
+        _histOccu,
+        _xHist,
+        _isNumeric,
+        _useDomain, _useProperty, _useFilter, _filtered,
+        _brush, _gBrush,
+        _bodyG;
     
     // A formatter for counts.
-    var formatCount = d3.format(",.0f");
-
-    //
-    //
-    // Definitions
-    //
-    //
-
-    // Get X scaling
-    var _x = d3.scale.linear()
-        .domain(getXDomain())
-        .range([0, quadrantWidth()]);
-    
-    // Generate histogram
-    var _hist = d3.layout.histogram()
-            .bins(_x.ticks(10))
-            ([].map.call(_data, function(d) { return d.y; }));
-        
-    // Get Y scaling
-    var _y = d3.scale.linear()
-    .domain(getYDomain())
-    .range([quadrantHeight(), 0]);
-
-    //
-    //
-    // Define axis and scales
-    //
-    //
-
-    var _xAxis = d3.svg.axis()
-                .scale(_x)
-                .orient("bottom");        
-
-    var _yAxis = d3.svg.axis()
-                .scale(_y)
-                .orient("left");
+    var _formatCount = d3.format(",.0f");
 
     //
     //
@@ -709,20 +691,93 @@ function histogram(_data, chartDiv) {
     
     _chart.render = function () {
         if (!_svg) {
-            _svg = d3.select(chartDiv).append("svg")
-                    .attr("height", _height)
-                    .attr("width", _width)
-                    .style("background-color", "white");
+            chooseType();
 
-            renderAxes(_svg);
+            initializeData();
 
-            defineBodyClip(_svg);
+            definitions();
 
-            renderBody(_svg);
+            initialzeSkeleton();
         }
 
         renderBars();
     };
+ 
+    //
+    //
+    // Choose bin type
+    //
+    //
+    
+    function chooseType()
+    {
+        if(_isNumeric == true)
+        {
+            _useDomain = getXDomain;
+            _useProperty = "key";
+            _useFilter = filterNumeric;
+
+        }
+        else
+        {
+            _useDomain = getXOccurenceDomain;
+            _useProperty = "value";
+            _useFilter = filterText;
+        }
+    }
+
+    //
+    //
+    // Data
+    //
+    //
+    
+    function initializeData()
+    {
+        // Crossfilter
+        _group = _filter.group();
+    }
+
+    //
+    //
+    // Definitions
+    //
+    //
+    
+    function definitions()
+    {
+        // Get X scaling
+        _x = d3.scale.linear()
+            .domain(_useDomain()).nice()
+            .range([0, quadrantWidth()]);
+
+        // Get hist bin scaling
+        _xHist = d3.scale.linear()
+            .domain(getXDomain())
+            .range([0, quadrantWidth()]);
+
+        // Histogram bins
+        _ticks = _x.ticks(_bins);
+
+        // Generate histogram data
+        _hist = d3.layout.histogram()
+                .bins(_ticks)
+                (_group.top(Infinity).map(function(d) { return d[_useProperty]; }));
+            
+        // Get Y scaling
+         _y = d3.scale.linear()
+        .domain(getYDomain())
+        .range([quadrantHeight(), 0]);   
+
+        // Define axis
+        _xAxis = d3.svg.axis()
+                    .scale(_x)
+                    .orient("bottom");        
+
+        _yAxis = d3.svg.axis()
+                    .scale(_y)
+                    .orient("left");
+    }
 
     // 
     //
@@ -730,49 +785,112 @@ function histogram(_data, chartDiv) {
     //
     //
     
-    function renderAxes(svg) {
-        var axesG = svg.append("g")
-                .attr("class", "axes");
+    function initialzeSkeleton()
+    {
+        var padding = 5;
 
-        axesG.append("g")
+        // SVG
+        _svg = d3.select(_chartDiv).append("svg")
+                .attr("height", _height)
+                .attr("width", _width)
+                .style("background-color", "white")
+                .attr("class", "chart")
+                .on("brush", _reloadAll);
+
+        // title
+        _svg.append("text")
+            .attr("class", "title")
+            .attr("text-anchor", "middle")
+            .attr("x",(_width/2))
+            .attr("y", 20)
+            .text(_title);
+
+        // x axis
+        _svg.append("g")
                 .attr("class", "x axis")
                 .attr("transform", function () {
                     return "translate(" + xStart() + "," + yStart() + ")";
                 })
                 .call(_xAxis);
 
-        axesG.append("g")
+        // x axis label
+        _svg.append("text")
+            .attr("class", "x label")
+            .attr("text-anchor", "middle")
+            .attr("x",(_width/2))
+            .attr("y", _height - 5)
+            .text("["+_xName+"]");
+
+        // y axis
+        _svg.append("g")
                 .attr("class", "y axis")
                 .attr("transform", function () {
                     return "translate(" + xStart() + "," + yEnd() + ")";
                 })
                 .call(_yAxis);
-    }
 
-    function defineBodyClip(svg) {
-        var padding = 5;
+        // y axis label
+        _svg.append("text")
+            .attr("class", "y label")
+            .attr("text-anchor", "middle")
+            .attr("x",-(_height/2))
+            .attr("y", 5)
+            .attr("dy", ".75em")
+            .attr("transform", "rotate(-90)")
+            .text("["+_yName+"]");
 
-        svg.append("defs")
+        // body clip
+        _svg.append("defs")
                 .append("clipPath")
                 .attr("id", "body-clip")
                 .append("rect")
-                .attr("x", 0 - padding)
+                .attr("x", 0 - 1.5 * padding)
                 .attr("y", 0)
-                .attr("width", quadrantWidth() + 2 * padding)
+                .attr("width", quadrantWidth() + 3 * padding)
                 .attr("height", quadrantHeight());
+
+        // create chart body
+        _bodyG = _svg.append("g")
+                .attr("class", "body")
+                .attr("transform", "translate(" 
+                        + xStart() 
+                        + "," 
+                        + yEnd() + ")")
+                .attr("clip-path", "url(#body-clip)");
+        
+        // create bars
+        var bar = _bodyG.selectAll(".bar")
+            .data(_hist)
+            .enter()
+            .append("g")
+            .attr("class","bar")
+            .attr("transform", function(d) { return "translate("+_x(d.x)+","+_y(0)+")"; });
+
+        bar.append("rect");
+
+        bar.append("text")
+            .attr("dy", ".75em")
+            .attr("y", -12)
+            .attr("text-anchor", "middle");
+
+        // create brush
+        _brush = d3.svg.brush()
+            .x(_x)
+            .on("brushend", brushended);
+
+        _gBrush = _bodyG.append("g")
+            .attr("class", "brush")
+            .call(_brush)
+            .call(_brush.event);
+
+        _gBrush.selectAll("rect")
+            .attr("rx", 5)
+            .attr("height", quadrantHeight())
+            .attr("y", 1);
+
+        _gBrush.selectAll(".resize").append("path").attr("d", resizePath);
     }
-
-    function renderBody(svg) {
-        if (!_bodyG)
-            _bodyG = svg.append("g")
-                    .attr("class", "body")
-                    .attr("transform", "translate(" 
-                            + xStart() 
-                            + "," 
-                            + yEnd() + ")")
-                    .attr("clip-path", "url(#body-clip)");
-    };
-
+    
     //
     //
     // Render Data
@@ -780,26 +898,32 @@ function histogram(_data, chartDiv) {
     //
 
     function renderBars() {
-
-        // Enter
+        // Update histogram data
+        _hist = d3.layout.histogram()
+                .bins(_ticks)
+                (_group.top(Infinity).filter(function(d) { return d.value>0; }).map(function(d) { return d[_useProperty]; }));
+        
+        // Update
         var bar = _bodyG.selectAll(".bar")
             .data(_hist)
-            .enter()
-            .append("g")
-            .attr("class","bar")
+            .transition()
+            .duration(500)
             .attr("transform", function(d) { return "translate("+_x(d.x)+","+_y(d.y)+")"; });
 
-        bar.append("rect")
+        bar.select("rect")
             .attr("x", 1)
             .attr("width", _x(_hist[0].dx) - 1)
             .attr("height", function(d) { return yStart() - _y(d.y); });
-
-        bar.append("text")
-            .attr("dy", ".75em")
-            .attr("y", -12)
+            
+        bar.select("text")
             .attr("x", _x(_hist[0].dx) / 2)
-            .attr("text-anchor", "middle")
-            .text(function(d) { return formatCount(d.y); });
+            .text(function(d) { return _formatCount(d.y); });
+
+        // Exit
+        _bodyG.selectAll(".bar")
+            .data(_hist)
+            .exit()
+            .remove();
     }
 
     //
@@ -833,25 +957,92 @@ function histogram(_data, chartDiv) {
     }
 
     function getXDomain() {
-        var xmax = d3.max(_data, function(d) {
-            return d.x;
-            });
+        return d3.extent(_group.top(Infinity), function(d) { return d.key; });
+    }
 
-        var xmin = d3.min(_data, function(d) {
-            return d.x;
-            });
-
-        return [Math.floor(xmin),Math.ceil(xmax)];
+    function getXOccurenceDomain() {
+        return d3.extent(_group.top(Infinity), function(d) { return d.value; });
     }
 
     function getYDomain() {
-        var ymax = d3.max(_hist, function(d) {
-            return d.y;
-            });
-
-        return [0,Math.ceil(ymax)+1];
+        var max = d3.max(_hist, function(d) { return d.y; });
+        return [0,max+(max/10)];
     }
 
+    // Creates the nice drag handle
+    function resizePath(d) {
+        var e = +(d == "e"),
+            x = e ? 1 : -1,
+            y = quadrantHeight() / 3;
+        return "M" + (.5 * x) + "," + y
+            + "A6,6 0 0 " + e + " " + (6.5 * x) + "," + (y + 6)
+            + "V" + (2 * y - 6)
+            + "A6,6 0 0 " + e + " " + (.5 * x) + "," + (2 * y)
+            + "Z"
+            + "M" + (2.5 * x) + "," + (y + 8)
+            + "V" + (2 * y - 8)
+            + "M" + (4.5 * x) + "," + (y + 8)
+            + "V" + (2 * y - 8);
+      }
+
+    // Histogram bin size round function
+    function round(number, increment, offset) {
+        return Math.ceil((number - offset) / increment ) * increment + offset;
+    }
+
+    // Brush functions
+    function brushended() {
+      if (!d3.event.sourceEvent) return; // only transition after input
+
+      var inc = _ticks[1]-_ticks[0];
+      var xDomain = _x.domain();
+
+      var extent0 = _brush.extent(),
+          extent1 = extent0.map(function(d) { 
+              return round(d,inc,xDomain[0]) 
+          });
+
+      // Add increment to max because _filter.range is [x,y)
+      if(extent1[1] >= xDomain[1]) extent1[1] = xDomain[1]+0.0000001;
+
+      // If selection is empty, clear filter
+      if ((extent1[1] - extent1[0]) < inc) {
+          extent1[1] = extent1[0];
+        _brush.clear();
+        _filter.filterAll();
+        _reloadAll();
+      }
+      else
+      {
+        // Filter
+        _useFilter(extent1);        
+
+        // Rerender everything except this chart
+        _reloadAll();
+      }
+
+      // Transition
+      d3.select(this).transition()
+          .call(_brush.extent(extent1))
+          .call(_brush.event);
+    }
+
+    // Numeric filter
+    function filterNumeric(extent1)
+    {
+        _filter.filter(extent1);
+    }
+
+    // Text filter
+    function filterText(extent1)
+    {
+        
+        _filtered = [].map.call(_group.all().filter(function(d) { return d.value >= extent1[0] && d.value < extent1[1] }), function(d) { return d.key; })
+
+        _filter.filter(function(d) {
+              return _filtered.indexOf(d) > -1;
+        });
+    }
 
     // 
     //
@@ -883,324 +1074,47 @@ function histogram(_data, chartDiv) {
         return _chart;
     };
 
-    return _chart;
-}
-
-function hexPlot(_data, chartDiv) {
-    //
-    //
-    // Variable declaration
-    //
-    //
-    
-    var _chart = {};
-
-    var _width = 600, _height = 600,
-            _margins = {top: 30, left: 30, right: 30, bottom: 30},
-            _svg,
-            _bodyG;
-    
-    //
-    //
-    // Definitions
-    //
-    //
-    
-    // Color scale
-    var _color = d3.scale.linear()
-        .domain([0,4])
-        .range(["white", "steelblue"])
-        .interpolate(d3.interpolateLab);
-
-    // Get X scaling
-    
-    var _xDomain = d3.extent(_data, function(d) { return d.x; });
-
-    var _x = d3.scale.linear()
-        .domain(_xDomain).nice()
-        .range([0,quadrantWidth()]);
-
-    
-    // Get Y scaling
-    
-    var _yDomain = d3.extent(_data, function(d) { return d.y; });
-
-    var _y = d3.scale.linear()
-        .domain(_yDomain).nice()
-        .range([quadrantHeight(),0]);
-
-    // Hexbins
-    var _hexbin = d3.hexbin()
-        .size([quadrantWidth(),quadrantHeight()])
-        .radius(25);
-
-    //
-    //
-    // Data reformating
-    //
-    //
-    
-    var _hexdata = [];
-
-    _data.forEach(function(d) {
-        _hexdata.push({point:[d.x,d.y], text:d.text});
-    })
-
-    //
-    //
-    // Define axis and scales
-    //
-    //
-
-    var _xAxis = d3.svg.axis()
-                .scale(_x)
-                .orient("bottom");        
-
-    var _yAxis = d3.svg.axis()
-                .scale(_y)
-                .orient("left");
-
-    //
-    //
-    // Main render function
-    //
-    //
-    
-    _chart.render = function () {
-        if (!_svg) {
-            _svg = d3.select(chartDiv).append("svg")
-                    .attr("height", _height)
-                    .attr("width", _width)
-                    .style("background-color", "white")
-                    .call(zoom);
-
-            renderAxes(_svg);
-
-            defineBodyClip(_svg);
-
-            renderBody(_svg);
-        }
-
-        renderBins();
-    };
-
-    // 
-    //
-    // Basic rendering
-    //
-    //
-    
-    function renderAxes(svg) {
-        var axesG = svg.append("g")
-                .attr("class", "axes");
-
-        axesG.append("g")
-                .attr("class", "x axis")
-                .attr("transform", function () {
-                    return "translate(" + xStart() + "," + yStart() + ")";
-                })
-                .call(_xAxis);
-
-        axesG.append("g")
-                .attr("class", "y axis")
-                .attr("transform", function () {
-                    return "translate(" + xStart() + "," + yEnd() + ")";
-                })
-                .call(_yAxis);
-    }
-
-    function defineBodyClip(svg) {
-        var padding = 0;
-
-        svg.append("defs")
-                .append("clipPath")
-                .attr("id", "body-clip-hex")
-                .append("rect")
-                .attr("x", 0 - padding)
-                .attr("y", 0)
-                .attr("width", quadrantWidth() + 2 * padding)
-                .attr("height", quadrantHeight());
-    }
-
-    function renderBody(svg) {
-        if (!_bodyG)
-            _bodyG = svg.append("g")
-                    .attr("class", "body")
-                    .attr("transform", "translate(" 
-                            + xStart() 
-                            + "," 
-                            + yEnd() + ")")
-                    .attr("clip-path", "url(#body-clip-hex)");
-    };
-
-    //
-    //
-    // Render Data
-    // 
-    //
-    var formatCount = d3.format(".0f");
-
-    function renderBins() {
-        var data = _hexbin([].map.call(_hexdata, function(d) { return scalePoint(d.point); }));
-        
-        var dict = d3.map(_hexdata.map(function(d) { return {point: scalePoint(d.point), text: d.text}; }), function(d) { return d.point; });
-        
-        // Groups
-        var bin = _bodyG.selectAll(".hexagon")
-            .data(data, function(d) { return d[0]; })
-            .enter()
-            .append("g")
-            .attr("class","hexagon");
-
-        // Enter
-        bin.append("path")
-            .style("fill", function(d) { return _color(d.length); })
-            .attr("d",_hexbin.hexagon(0));
-                //.on("mouseover",tip.show)
-                //.on("mouseout", tip.hide);
-
-        bin.append("text")
-            .attr("dy", ".25em")
-            .attr("y", function(d) { return d.y; })
-            .attr("x", function(d) { return d.x; })
-            .attr("text-anchor", "middle");
-
-        // Update
-        _bodyG.selectAll(".hexagon").select("path")
-                .data(data, function(d) { return d[0]; })
-                .attr("transform", function(d) { return "translate("+d.x+","+d.y+")"; })
-                .transition()
-                .duration(800)
-                .attr("d", function(d) {
-                    if(d.length>1)
-                    {
-                        return _hexbin.hexagon(25);
-                    }
-                    else
-                    {
-                        return _hexbin.hexagon(0);
-                    }
-                })
-                .style("fill", function(d) { return _color(d.length); });
-
-        _bodyG.selectAll(".hexagon").select("text")
-                .data(data, function(d) { return d[0]; })
-                .attr("y", function(d) { return d.y; })
-                .attr("x", function(d) { return d.x; })
-                .transition()
-                .duration(500)
-                .text(function(d) {
-                    if(d.length>1)
-                    {
-                        return d.length;
-                    }
-                    else
-                    {
-                        return dict.get(d[0]).text;
-                    }
-                    return "Err";
-                });
-
-        // Exit
-        _bodyG.selectAll(".hexagon")
-            .data(data, function(d) { return d[0]; })
-            .exit()
-            .remove();
-    }
-
-    //
-    //
-    // Zoom functions
-    //
-    //
-    
-    var zoom = d3.behavior.zoom()
-        .x(_x)
-        .y(_y)
-        .scaleExtent(_xDomain)
-        .on("zoom", zoomed);
-
-    function zoomed() {
-      renderBins();
-      _svg.select(".x.axis").call(_xAxis);
-      _svg.select(".y.axis").call(_yAxis);
-
-    }
-
-    function reset() {
-      d3.transition().duration(750).tween("zoom", function() {
-        var ix = d3.interpolate(_x.domain(), _xDomain),
-            iy = d3.interpolate(_y.domain(), _yDomain);
-        return function(t) {
-          zoom.x(_x.domain(ix(t))).y(_y.domain(iy(t)));
-          zoomed();
-        };
-      });
-    }
-
-    //
-    //
-    // Internal Functions
-    //
-    //
-
-    function xStart() {
-        return _margins.left;
-    }
-
-    function yStart() {
-        return _height - _margins.bottom;
-    }
-
-    function xEnd() {
-        return _width - _margins.right;
-    }
-
-    function yEnd() {
-        return _margins.top;
-    }
-
-    function quadrantWidth() {
-        return _width - _margins.left - _margins.right;
-    }
-
-    function quadrantHeight() {
-        return _height - _margins.top - _margins.bottom;
-    }
-
-    function getXDomain() {
-        return d3.extent(_data, function(d) { return d.x });
-    }
-
-    function getYDomain() {
-        return d3.extent(_data, function(d) { return d.y });
-    }
-
-    function scalePoint(point) {
-        return [_x(point[0]), _y(point[1])];
-    }
-
-    // 
-    //
-    // External function
-    //
-    //
-
-    _chart.width = function (w) {
-        if (!arguments.length) return _width;
-        _width = w;
+    _chart.bins = function (b) {
+        if (!arguments.length) return _bins;
+        _bins = b;
         return _chart;
     };
 
-    _chart.height = function (h) {
-        if (!arguments.length) return _height;
-        _height = h;
+    _chart.dimension = function (d,f) {
+        if (arguments.length<2) return _dimension, _filter;
+        _dimension = d;
+        _filter = f;
         return _chart;
     };
 
-    _chart.margins = function (m) {
-        if (!arguments.length) return _margins;
-        _margins = m;
+    _chart.reloadAll = function (f) {
+        if (!arguments.length) return _reloadAll;
+        _reloadAll = f;
+        return _chart;
+    };
+
+    _chart.area = function (a) {
+        if (!arguments.length) return _chartDiv;
+        _chartDiv = a;
+        return _chart;
+    };
+
+    _chart.axisNames = function (a,b) {
+        if (arguments.length<2) return _xName, _yName;
+        _xName = a;
+        _yName = b;
+        return _chart;
+    };
+
+    _chart.title = function (t) {
+        if (!arguments.length) return _title;
+        _title = t;
+        return _chart;
+    };
+
+    _chart.isNumeric = function (t) {
+        if (!arguments.length) return _isNumeric;
+        _isNumeric = t;
         return _chart;
     };
 
@@ -1233,20 +1147,97 @@ for (var i = 0; i < numberOfSeries; ++i)
     }));
 
 // Create chart objects
-var scatter = scatterPlotChart("#scatter");
-var bar = barChart("#bar1");
-var hist = histogram(data[0], "#hist1");
-var hex = hexPlot(data[0], "#hex");
+//var scatter = scatterPlotChart("#scatter");
+//var bar = barChart("#bar1");
+
 
 // fill up charts with data
+/*
 data.forEach(function (series) {
     scatter.addSeries(series);
 });
 
 bar.setSeries(data[0]);
-
 // Render charts
 scatter.render();
 bar.render();
-hist.render();
-hex.render();
+*/
+
+// Import data
+d3.csv("tags_final.csv")
+.row(function(d) {
+    return { id: +d.ID, tagName: d.TagName, importance: +d.Importance , songName: d.SongName};
+})
+.get(function(error, tags) {
+    //Due to the asyncronity of d3.import, the data is only available within this function
+    //
+    // START
+    //
+    //
+    
+    // 
+    //
+    // Data
+    //
+    //
+    
+    // Crossfilter 
+    var cf = crossfilter(tags);
+    
+    //  By name crossfilter and mapping
+    var byName = cf.dimension(function(d) { return d.tagName; });
+    var filterByName = cf.dimension(function(d) { return d.tagName; });
+
+    var byImportance = cf.dimension(function(d) { return d.importance; });
+    var filterByImportance = cf.dimension(function(e) { return e.importance; });
+
+    //
+    //
+    // Visualizition
+    //
+    //
+    
+    // Create variables
+    var hex = hexPlot()
+        .area("#hex")
+        .height(600)
+        .width(600)
+        .dimension(byImportance,"importance", "tagName")
+        .binSize(25);
+
+    var hist1 = histogram()
+        .area("#hist1")
+        .height(250)
+        .width(600)
+        .isNumeric(true)
+        .dimension(byImportance,filterByImportance)
+        .reloadAll(renderAll)
+        .bins(20)
+        .axisNames("Importance", "#")
+        .title("Importance Histogram");
+
+    var hist2 = histogram()
+        .area("#hist2")
+        .height(250)
+        .width(600)
+        .isNumeric(false)
+        .dimension(byName,filterByName)
+        .reloadAll(renderAll)
+        .bins(10)
+        .axisNames("Occurrence", "#")
+        .title("Occurrence Histogram");
+
+   function renderAll()
+   {
+        // Render
+        hex.render();
+        hist1.render();
+        hist2.render();
+   }
+
+   renderAll();
+
+    //
+    //
+    // END
+});
