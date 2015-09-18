@@ -1,12 +1,3 @@
-.chart div {
-  font: 10px normal Arial;
-  background-color: steelblue;
-  text-align: right;
-  padding: 3px;
-  margin: 1px;
-  color: white;
-}
-
 .axis path,
 .axis line {
 	fill: none;
@@ -20,16 +11,35 @@ rect.resetButton {
     stroke: black;
 }
 
-text.mono {
-	font-size: 9pt;
-	font-family: normal Arial;
+.tick {
+	font-size: 10pt;
 	fill: #000;
 }
 
-.tick {
+.x.label {
 	font-size: 10pt;
-	font-family: normal Arial;
 	fill: #000;
+}
+
+.y.label {
+	font-size: 10pt;
+	fill: #000;
+}
+
+.title {
+	font-size: 20pt;
+	fill: #000;
+}
+
+.hexagon text {
+    z-index: -1;
+	font-size: 10pt;
+	fill: black;
+}
+
+.hexagon text.group {
+	font-size: 10pt;
+	fill: white;
 }
 
 .circle {
@@ -64,4 +74,47 @@ text.mono {
   margin: -1px 0 0 0;
   top: 100%;
   left: 0;
+}
+
+rect.bar {
+  fill: red;
+  shape-rendering: crispEdges;
+  stroke: none;
+}
+
+.hist.highlight {
+    stroke: black;
+    stroke-width: 5;
+    stroke-opacity: 0.3;
+}
+
+.text._0.highlight {
+    font-size: 20px;
+    stroke: darkblue;
+    stroke-width: 3px;
+}
+.bar rect{
+  fill: #535f6c;
+  shape-rendering: crispEdges;
+}
+
+.bar text{
+  fill: black;
+}
+
+.hexagon path {
+  fill: none;
+  stroke: white;
+  stroke-width: .5px;
+}
+
+.brush .extent {
+  stroke: #fff;
+  fill-opacity: .125;
+  shape-rendering: crispEdges;
+}
+
+.brush .resize path {
+  fill: #eee;
+  stroke: #666;
 }
