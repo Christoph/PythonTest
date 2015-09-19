@@ -127,7 +127,6 @@ var dataPoints = []
             .y(_y)
             .scaleExtent(d3.extent(_yDomain.concat(_xDomain)))
             .on("zoom", zoomed);
-            //.on("zoomend", relax);
     }
 
     // 
@@ -252,7 +251,7 @@ var dataPoints = []
         // Enter
         bin.append("path")
             .style("fill", function(d) { return _color(d.length); })
-            .attr("d",_hexbin.hexagon(0));
+            .attr("d",_hexbin.hexagon(_binSize));
 
         bin.append("text")
             .attr("dy", ".25em")
@@ -287,7 +286,8 @@ var dataPoints = []
                 .attr("x", function(d) { return d.x; })
                 .transition()
                 .duration(500)
-                .style("fill", "white");
+                .style("fill", "#535f6c")
+                .text(function(d) { return d.length; });
 
         // Exit
         _bodyG.selectAll(".hexagon")
@@ -301,7 +301,7 @@ var dataPoints = []
             .remove();
 
         // Update text
-        d3.select(".records").text("# of tags: "+_group.all().filter(function(d) { return d.value > 0; }).length);
+        d3.select(".records").text("show all tags: "+_group.all().filter(function(d) { return d.value > 0; }).length);
         relax();
 }
 
@@ -425,7 +425,7 @@ var dataPoints = []
       .attr('class', 'd3-tip')
       .offset([-10, 0])
       .html(function(d) {
-        return "<strong>Importance:</strong> <span>" + formatImportance(_x.invert(d.x)) + "</span><br>" + "<strong>Occurrence:</strong> <span>" + formatCount(_y.invert(d.y)) + "</span>";
+        return "<strong>"+_xName+":</strong> <span>" + formatImportance(_x.invert(d.x)) + "</span><br>" + "<strong>"+_yName+":</strong> <span>" + Math.round(_y.invert(d.y)) + "</span>";
       })
 
     // 
@@ -461,6 +461,12 @@ var dataPoints = []
         return _chart;
     };
 
+    _chart.colors = function (c) {
+        if (!arguments.length) return _color;
+        _color = c;
+        return _chart;
+    };
+
     _chart.dimension = function (d, x, t) {
         if (arguments.length < 3) {
             return _dimension, _dim, _text;
@@ -480,6 +486,13 @@ var dataPoints = []
     _chart.binSize = function (b) {
         if (!arguments.length) return _binSize;
         _binSize = b;
+        return _chart;
+    };
+
+    _chart.axisNames = function (a,b) {
+        if (!arguments.length) return _xName, _yName;
+        _xName = a;
+        _yName = b;
         return _chart;
     };
 
@@ -714,6 +727,7 @@ function histogram() {
         // create brush
         _brush = d3.svg.brush()
             .x(_x)
+            .on("brush", brushing)
             .on("brushend", brushended);
 
         _gBrush = _bodyG.append("g")
@@ -882,6 +896,18 @@ function histogram() {
         });
     }
 
+    // Update while brushing
+    function brushing()
+    {
+        if (!d3.event.sourceEvent) return; // only transition after input
+
+        // Filter
+        _useFilter(_brush.extent());        
+
+        // Rerender everything except this chart
+        _reloadAll();
+
+    }
     // 
     //
     // External function
